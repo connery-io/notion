@@ -1,11 +1,13 @@
 import { ActionDefinition, ActionContext, OutputObject } from 'connery';
 import { Client, iteratePaginatedAPI } from '@notionhq/client';
 import OpenAI from 'openai';
+import { askModel } from '../shared/shared.js';
 
 const actionDefinition: ActionDefinition = {
   key: 'askMyPrivateNotionPage',
   name: 'Ask my Knowledge from Private Notion Page',
-  description: 'This action enables users to ask questions and receive answers from a knowledge base hosted on a private Notion page. The action accesses the Notion page via its URL using the Notion API and an API key. Users’ questions are processed by OpenAI, which generates answers based on the content retrieved from the page. The action supports all content elements, including toggles.',
+  description:
+    'This action enables users to ask questions and receive answers from a knowledge base hosted on a private Notion page. The action accesses the Notion page via its URL using the Notion API and an API key. Users’ questions are processed by OpenAI, which generates answers based on the content retrieved from the page. The action supports all content elements, including toggles.',
   type: 'read',
   inputParameters: [
     {
@@ -47,7 +49,7 @@ const actionDefinition: ActionDefinition = {
     {
       key: 'openaiModel',
       name: 'OpenAI Model',
-      description: 'The model to use for generating the answer (e.g., gpt-3.5-turbo, gpt-4-turbo, gpt-4o-mini, etc.).',
+      description: 'The model to use for generating the answer (e.g. gpt-4-turbo, gpt-4o-mini, etc.).',
       type: 'string',
       validation: {
         required: true,
@@ -59,9 +61,8 @@ const actionDefinition: ActionDefinition = {
   },
   outputParameters: [
     {
-      key: 'answer',
-      name: 'Answer',
-      description: 'The answer to the user’s question based on the Notion content.',
+      key: 'textResponse',
+      name: 'Text response',
       type: 'string',
       validation: {
         required: true,
@@ -89,7 +90,7 @@ export async function handler({ input }: ActionContext): Promise<OutputObject> {
     const pageContent = blocks.map(getTextFromBlock).join('\n');
 
     // Log the extracted Notion content length
-    console.log("Extracted Notion content length:", pageContent.length, "characters");
+    console.log('Extracted Notion content length:', pageContent.length, 'characters');
 
     // Initialize OpenAI with the provided API key
     const openai = new OpenAI({ apiKey: openaiApiKey });
@@ -119,8 +120,8 @@ export async function handler({ input }: ActionContext): Promise<OutputObject> {
 
     // Log and handle the response
     if (!response.choices || response.choices.length === 0) {
-      console.error("Model did not respond with any choices.");
-      throw new Error("Model did not respond.");
+      console.error('Model did not respond with any choices.');
+      throw new Error('Model did not respond.');
     }
 
     const messageContent = response.choices[0].message.content;
@@ -130,16 +131,15 @@ export async function handler({ input }: ActionContext): Promise<OutputObject> {
       throw new Error("Model's answer is too short.");
     }
 
-    console.log("Model output length:", messageContent.length, "characters");
+    console.log('Model output length:', messageContent.length, 'characters');
 
     const answer = messageContent.trim();
 
     // Return the model's answer directly
-    return { answer };
-
+    return { textResponse: answer };
   } catch (error: any) {
-    console.error("An error occurred:", (error as Error).message);
-    return { answer: `Error occurred: ${(error as Error).message}` };
+    console.error('An error occurred:', (error as Error).message);
+    throw new Error(`Error occurred: ${(error as Error).message}`);
   }
 }
 

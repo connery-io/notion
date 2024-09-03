@@ -1,11 +1,13 @@
 import puppeteer from 'puppeteer';
 import { ActionDefinition, ActionContext, OutputObject } from 'connery';
 import OpenAI from 'openai';
+import { askModel } from '../shared/shared.js';
 
 const actionDefinition: ActionDefinition = {
   key: 'askMyPublicNotionPage',
   name: 'Ask my Knowledge from Public Notion Page',
-  description: 'This action enables users to ask questions and receive answers from a knowledge base hosted on a public Notion page. The action accesses the Notion page via its URL without requiring any authorization. Users’ questions are processed by OpenAI, which generates answers only if the content’s relevance is deemed to have high certainty. If no satisfactory answer is found, the action suggests a follow-up to report the missing content. Note: This action can only process Notion pages that do not use toggle elements.',
+  description:
+    'This action enables users to ask questions and receive answers from a knowledge base hosted on a public Notion page. The action accesses the Notion page via its URL without requiring any authorization. Users’ questions are processed by OpenAI, which generates answers only if the content’s relevance is deemed to have high certainty. If no satisfactory answer is found, the action suggests a follow-up to report the missing content. Note: This action can only process Notion pages that do not use toggle elements.',
   type: 'read',
   inputParameters: [
     {
@@ -50,9 +52,8 @@ const actionDefinition: ActionDefinition = {
   },
   outputParameters: [
     {
-      key: 'answer',
-      name: 'Answer',
-      description: 'The answer to the user’s question based on the Notion content.',
+      key: 'textResponse',
+      name: 'Text response',
       type: 'string',
       validation: {
         required: true,
@@ -71,7 +72,7 @@ export async function handler({ input }: ActionContext): Promise<OutputObject> {
     const notionContent = await fetchNotionContentWithPuppeteer(notionPageUrl);
 
     // Log the extracted Notion content length
-    console.log("Extracted Notion content length:", notionContent.length, "characters");
+    console.log('Extracted Notion content length:', notionContent.length, 'characters');
 
     // Initialize OpenAI with the provided API key
     const openai = new OpenAI({
@@ -89,8 +90,8 @@ export async function handler({ input }: ActionContext): Promise<OutputObject> {
 
     // Log and handle the response
     if (!response.choices || response.choices.length === 0) {
-      console.error("Model did not respond with any choices.");
-      throw new Error("Model did not respond.");
+      console.error('Model did not respond with any choices.');
+      throw new Error('Model did not respond.');
     }
 
     const messageContent = response.choices[0].message.content;
@@ -100,16 +101,15 @@ export async function handler({ input }: ActionContext): Promise<OutputObject> {
       throw new Error("Model's answer is too short.");
     }
 
-    console.log("Model output length:", messageContent.length, "characters");
+    console.log('Model output length:', messageContent.length, 'characters');
 
     const answer = messageContent.trim();
 
     // Return the model's answer directly
-    return { answer };
-
+    return { textResponse: answer };
   } catch (error) {
-    console.error("An error occurred:", (error as Error).message);
-    return { answer: `Error occurred: ${(error as Error).message}` };
+    console.error('An error occurred:', (error as Error).message);
+    throw new Error(`Error occurred: ${(error as Error).message}`);
   }
 }
 
@@ -128,9 +128,8 @@ async function fetchNotionContentWithPuppeteer(url: string): Promise<string> {
     await browser.close();
 
     return content;
-
   } catch (error) {
-    console.error("Failed to fetch Notion page:", (error as Error).message);
-    throw new Error("Notion page not available.");
+    console.error('Failed to fetch Notion page:', (error as Error).message);
+    throw new Error('Notion page not available.');
   }
 }

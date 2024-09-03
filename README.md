@@ -1,6 +1,9 @@
 # notion
 
-Plugin enables to interact with notion content, especially working with and extending knowledge
+This plugin enables interaction with Notion-based knowledge repositories, allowing users to query and retrieve answers from both public and private Notion pages. The plugin integrates with OpenAI to provide high-certainty answers based on the content available in Notion and suggests follow-ups in case of missing content.
+
+Using the Connery platform, requests get securely logged, allowing for later analysis to identify gaps and opportunities to improve both the knowledge base and the action setup itself.
+This ensures that your knowledge management processes can be continuously refined over time.
 
 ## Repository structure
 
