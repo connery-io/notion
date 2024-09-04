@@ -88,10 +88,6 @@ export async function handler({ input }: ActionContext): Promise<OutputObject> {
     // Process the blocks to get the content as a single string
     const pageContent = blocks.map(getTextFromBlock).join('\n');
 
-    // Log the extracted Notion content length
-    console.log("Extracted Notion content length:", pageContent.length, "characters");
-    console.log("Extracted Notion content:", pageContent);
-
     // Check if the content length is less than 5 characters
     if (pageContent.length < 5) {
       throw new Error(`The extracted content is too short: ${pageContent.length} characters. It must be at least 5 characters long.`);
