@@ -111,7 +111,7 @@ export async function handler({ input }: ActionContext): Promise<OutputObject> {
     const userQuestion = `Based on this content, please respond to the following request or question with high confidence:
     ”${question}”. 
     If you are not confident that the content fully addresses the request, respond with: 
-    ‘My content source does not provide enough context to answer your request. If you want to report this knowledge gap to the admin, just trigger another action with “Report knowledge gap:” and add your original request.’
+    ‘I don’t have enough information to answer your question.’
     `;
 
     // Request completion from OpenAI using the specified model
