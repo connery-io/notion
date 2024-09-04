@@ -1,11 +1,10 @@
 import { ActionDefinition, ActionContext, OutputObject } from 'connery';
-import { Client, iteratePaginatedAPI } from '@notionhq/client';
+import { Client, iteratePaginatedAPI, isFullBlock } from '@notionhq/client'; // Import Client and types from Notion
 import OpenAI from 'openai';
-import { askModel } from '../shared/shared.js';
 
 const actionDefinition: ActionDefinition = {
-  key: 'askMyPrivateNotionPage',
-  name: 'Ask my Knowledge from Private Notion Page',
+  key: 'askPrivateNotionPage',
+  name: 'Ask Private Notion Page',
   description:
     'This action enables users to ask questions and receive answers from a knowledge base hosted on a private Notion page. The action accesses the Notion page via its URL using the Notion API and an API key. Users’ questions are processed by OpenAI, which generates answers based on the content retrieved from the page. The action supports all content elements, including toggles.',
   type: 'read',
@@ -29,15 +28,6 @@ const actionDefinition: ActionDefinition = {
       },
     },
     {
-      key: 'question',
-      name: 'User Question',
-      description: 'The question asked by the user about the particular knowledge base.',
-      type: 'string',
-      validation: {
-        required: true,
-      },
-    },
-    {
       key: 'openaiApiKey',
       name: 'OpenAI API Key',
       description: 'API key to authenticate with OpenAI',
@@ -50,6 +40,15 @@ const actionDefinition: ActionDefinition = {
       key: 'openaiModel',
       name: 'OpenAI Model',
       description: 'The model to use for generating the answer (e.g. gpt-4-turbo, gpt-4o-mini, etc.).',
+      type: 'string',
+      validation: {
+        required: true,
+      },
+    },
+    {
+      key: 'question',
+      name: 'User Question',
+      description: 'The question asked by the user about the particular knowledge base.',
       type: 'string',
       validation: {
         required: true,
@@ -90,32 +89,40 @@ export async function handler({ input }: ActionContext): Promise<OutputObject> {
     const pageContent = blocks.map(getTextFromBlock).join('\n');
 
     // Log the extracted Notion content length
-    console.log('Extracted Notion content length:', pageContent.length, 'characters');
+    console.log("Extracted Notion content length:", pageContent.length, "characters");
+    console.log("Extracted Notion content:", pageContent);
+
+    // Check if the content length is less than 5 characters
+    if (pageContent.length < 5) {
+      throw new Error(`The extracted content is too short: ${pageContent.length} characters. It must be at least 5 characters long.`);
+    }
 
     // Initialize OpenAI with the provided API key
     const openai = new OpenAI({ apiKey: openaiApiKey });
 
-    // Create the prompt with instructions for the model
-    const prompt = `
-      You are an FAQ expert. When asked a question or given a request related to a specific topic, you provide an accurate and concise answer based strictly on the content provided. 
-      You respond in the same language as the user’s input and adjust your answer to fit the context of the request, whether it’s a direct question or an indirect inquiry. 
-      You never guess or paraphrase — only answer if the explicit content for that request is available. 
-      If there are any disclaimers or indications in the content that it should not be shared with clients or is a work in progress, include that information only if it is explicitly mentioned. 
-      Here is the content you should use to generate your answer:
-
-      ”${pageContent}”
-
-      Based on this content, please respond to the following request or question with high confidence:
-
-      ”${question}”. 
-      If you are not confident that the content fully addresses the request, respond with: 
-      ‘My content source does not provide enough context to answer your request. If you want to report this knowledge gap to the admin, just trigger another action with “Report knowledge gap:” and add your original request.’
+    // Create the system message with instructions for the model
+    const systemMessage = `You are an FAQ expert. When asked a question or given a request related to a specific topic, you provide an accurate and concise answer based strictly on the content provided. 
+    You respond in the same language as the user’s input and adjust your answer to fit the context of the request, whether it’s a direct question or an indirect inquiry.
+    You never guess or paraphrase — only answer if the explicit content for that request is available. 
+    If there are any disclaimers or indications in the content that it should not be shared with clients or is a work in progress, include that information only if it is explicitly mentioned. 
+    Here is the content you should use to generate your answer:
+    ”${pageContent}”
     `;
-
+    
+    // Set the user's question separately
+    const userQuestion = `Based on this content, please respond to the following request or question with high confidence:
+    ”${question}”. 
+    If you are not confident that the content fully addresses the request, respond with: 
+    ‘My content source does not provide enough context to answer your request. If you want to report this knowledge gap to the admin, just trigger another action with “Report knowledge gap:” and add your original request.’
+    `;
+    
     // Request completion from OpenAI using the specified model
     const response = await openai.chat.completions.create({
       model: openaiModel,
-      messages: [{ role: 'user', content: prompt }],
+      messages: [
+        { role: 'system', content: systemMessage },
+        { role: 'user', content: userQuestion },
+      ],
     });
 
     // Log and handle the response
@@ -131,8 +138,6 @@ export async function handler({ input }: ActionContext): Promise<OutputObject> {
       throw new Error("Model's answer is too short.");
     }
 
-    console.log('Model output length:', messageContent.length, 'characters');
-
     const answer = messageContent.trim();
 
     // Return the model's answer directly
@@ -145,12 +150,18 @@ export async function handler({ input }: ActionContext): Promise<OutputObject> {
 
 /**
  * Helper function to retrieve all blocks from a Notion page using pagination.
- * This ensures that all content from the page is fetched, even if it spans multiple pages of results.
+ * Recursively fetches child blocks if they exist.
  */
 async function retrieveBlockChildren(notion: Client, id: string) {
-  const blocks = [];
+  const blocks: Array<any> = [];
   for await (const block of iteratePaginatedAPI(notion.blocks.children.list, { block_id: id })) {
     blocks.push(block);
+
+    // Recursively fetch and process child blocks if the block has children
+    if (isFullBlock(block) && block.has_children) {
+      const childBlocks = await retrieveBlockChildren(notion, block.id);
+      blocks.push(...childBlocks); // Add child blocks to the main block array
+    }
   }
   return blocks;
 }
