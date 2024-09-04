@@ -3,8 +3,8 @@ import { Client, iteratePaginatedAPI, isFullBlock } from '@notionhq/client'; // 
 import OpenAI from 'openai';
 
 const actionDefinition: ActionDefinition = {
-  key: 'askPrivateNotionPage',
-  name: 'Ask Private Notion Page',
+  key: 'askNotionPage',
+  name: 'Ask Notion Page',
   description:
     'This action enables users to ask questions and receive answers from a knowledge base hosted on a private Notion page. The action accesses the Notion page via its URL using the Notion API and an API key. Users’ questions are processed by OpenAI, which generates answers based on the content retrieved from the page. The action supports all content elements, including toggles.',
   type: 'read',
@@ -90,7 +90,9 @@ export async function handler({ input }: ActionContext): Promise<OutputObject> {
 
     // Check if the content length is less than 5 characters
     if (pageContent.length < 5) {
-      throw new Error(`The extracted content is too short: ${pageContent.length} characters. It must be at least 5 characters long.`);
+      throw new Error(
+        `The extracted content is too short: ${pageContent.length} characters. It must be at least 5 characters long.`,
+      );
     }
 
     // Initialize OpenAI with the provided API key
@@ -104,14 +106,14 @@ export async function handler({ input }: ActionContext): Promise<OutputObject> {
     Here is the content you should use to generate your answer:
     ”${pageContent}”
     `;
-    
+
     // Set the user's question separately
     const userQuestion = `Based on this content, please respond to the following request or question with high confidence:
     ”${question}”. 
     If you are not confident that the content fully addresses the request, respond with: 
     ‘My content source does not provide enough context to answer your request. If you want to report this knowledge gap to the admin, just trigger another action with “Report knowledge gap:” and add your original request.’
     `;
-    
+
     // Request completion from OpenAI using the specified model
     const response = await openai.chat.completions.create({
       model: openaiModel,
