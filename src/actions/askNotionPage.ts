@@ -73,14 +73,12 @@ const actionDefinition: ActionDefinition = {
 export default actionDefinition;
 
 export async function handler({ input }: ActionContext): Promise<OutputObject> {
-  const { notionPageUrl, notionApiKey, question, openaiApiKey, openaiModel } = input;
-
   try {
     // Extract the page ID from the provided Notion URL
-    const notionPageId = extractPageIdFromUrl(notionPageUrl);
+    const notionPageId = extractPageIdFromUrl(input.notionPageUrl);
 
     // Initialize the Notion client
-    const notion = new Client({ auth: notionApiKey });
+    const notion = new Client({ auth: input.notionApiKey });
 
     // Retrieve all blocks of the Notion page
     const blocks = await retrieveBlockChildren(notion, notionPageId);
@@ -95,48 +93,8 @@ export async function handler({ input }: ActionContext): Promise<OutputObject> {
       );
     }
 
-    // Initialize OpenAI with the provided API key
-    const openai = new OpenAI({ apiKey: openaiApiKey });
-
-    // Create the system message with instructions for the model
-    const systemMessage = `You are an FAQ expert. When asked a question or given a request related to a specific topic, you provide an accurate and concise answer based strictly on the content provided. 
-    You respond in the same language as the user’s input and adjust your answer to fit the context of the request, whether it’s a direct question or an indirect inquiry.
-    You never guess or paraphrase — only answer if the explicit content for that request is available. 
-    If there are any disclaimers or indications in the content that it should not be shared with clients or is a work in progress, include that information only if it is explicitly mentioned. 
-    Here is the content you should use to generate your answer:
-    ”${pageContent}”
-    `;
-
-    // Set the user's question separately
-    const userQuestion = `Based on this content, please respond to the following request or question with high confidence:
-    ”${question}”. 
-    If you are not confident that the content fully addresses the request, respond with: 
-    ‘I don’t have enough information to answer your question.’
-    `;
-
-    // Request completion from OpenAI using the specified model
-    const response = await openai.chat.completions.create({
-      model: openaiModel,
-      messages: [
-        { role: 'system', content: systemMessage },
-        { role: 'user', content: userQuestion },
-      ],
-    });
-
-    // Log and handle the response
-    if (!response.choices || response.choices.length === 0) {
-      console.error('Model did not respond with any choices.');
-      throw new Error('Model did not respond.');
-    }
-
-    const messageContent = response.choices[0].message.content;
-
-    if (messageContent === null || messageContent.trim().length === 0) {
-      console.error("Model's answer length is too short.");
-      throw new Error("Model's answer is too short.");
-    }
-
-    const answer = messageContent.trim();
+    // Ask OpenAI for an answer
+    const answer = await askOpenAI(input.openaiApiKey, input.openaiModel, pageContent, input.question);
 
     // Return the model's answer directly
     return { textResponse: answer };
@@ -144,6 +102,58 @@ export async function handler({ input }: ActionContext): Promise<OutputObject> {
     console.error('An error occurred:', (error as Error).message);
     throw new Error(`Error occurred: ${(error as Error).message}`);
   }
+}
+
+async function askOpenAI(
+  openaiApiKey: string,
+  openaiModel: string,
+  pageContent: string,
+  question: string,
+): Promise<string> {
+  // Initialize OpenAI with the provided API key
+  const openai = new OpenAI({ apiKey: openaiApiKey });
+
+  // Create the system message with instructions for the model
+  const systemMessage = `You are an FAQ expert. When asked a question or given a request related to a specific topic, you provide an accurate and concise answer based strictly on the content provided. 
+    You respond in the same language as the user’s input and adjust your answer to fit the context of the request, whether it’s a direct question or an indirect inquiry.
+    You never guess or paraphrase — only answer if the explicit content for that request is available. 
+    If there are any disclaimers or indications in the content that it should not be shared with clients or is a work in progress, include that information only if it is explicitly mentioned. 
+    Here is the content you should use to generate your answer:
+    ”${pageContent}”
+    `;
+
+  // Set the user's question separately
+  const userQuestion = `Based on this content, please respond to the following request or question with high confidence:
+    ”${question}”. 
+    If you are not confident that the content fully addresses the request, respond with: 
+    ‘I don’t have enough information to answer your question.’
+    `;
+
+  // Request completion from OpenAI using the specified model
+  const response = await openai.chat.completions.create({
+    model: openaiModel,
+    messages: [
+      { role: 'system', content: systemMessage },
+      { role: 'user', content: userQuestion },
+    ],
+  });
+
+  // Log and handle the response
+  if (!response.choices || response.choices.length === 0) {
+    console.error('Model did not respond with any choices.');
+    throw new Error('Model did not respond.');
+  }
+
+  const messageContent = response.choices[0].message.content;
+
+  if (messageContent === null || messageContent.trim().length === 0) {
+    console.error("Model's answer length is too short.");
+    throw new Error("Model's answer is too short.");
+  }
+
+  const answer = messageContent.trim();
+
+  return answer;
 }
 
 /**
