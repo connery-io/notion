@@ -1,8 +1,8 @@
 import { ActionDefinition, ActionContext, OutputObject } from 'connery';
-import { Client, iteratePaginatedAPI, isFullBlock } from '@notionhq/client'; // Import Client and types from Notion
+import { Client, iteratePaginatedAPI, isFullBlock } from '@notionhq/client';
 
 const actionDefinition: ActionDefinition = {
-  key: 'askNotionPage',
+  key: 'getNotionPageContent',
   name: 'Get Notion Page Content',
   description:
     'This action retrieves the content of a Notion page using its URL and the Notion API. It can optionally include instructions before the page content. The action required the Notion page URL and Notion API key connected to this URL. It fetches all content elements including text, media, and toggles, and returns the page content as a single string. It does not extract content form inline DBs.',
@@ -41,8 +41,8 @@ const actionDefinition: ActionDefinition = {
   },
   outputParameters: [
     {
-      key: 'notionContent',
-      name: 'Notion Content',
+      key: 'notionPageContent',
+      name: 'Notion Page Content',
       type: 'string',
       validation: {
         required: true,
@@ -54,40 +54,35 @@ const actionDefinition: ActionDefinition = {
 export default actionDefinition;
 
 export async function handler({ input }: ActionContext): Promise<OutputObject> {
-  try {
-    // Extract the page ID from the provided Notion URL
-    const notionPageId = extractPageIdFromUrl(input.notionPageUrl);
+  // Extract the page ID from the provided Notion URL
+  const notionPageId = extractPageIdFromUrl(input.notionPageUrl);
 
-    // Initialize the Notion client
-    const notion = new Client({ auth: input.notionApiKey });
+  // Initialize the Notion client
+  const notion = new Client({ auth: input.notionApiKey });
 
-    // Retrieve all blocks of the Notion page
-    const blocks = await retrieveBlockChildren(notion, notionPageId);
+  // Retrieve all blocks of the Notion page
+  const blocks = await retrieveBlockChildren(notion, notionPageId);
 
-    // Process the blocks to get the content as a single string
-    const pageContent = blocks.map(getTextFromBlock).join('\n');
+  // Process the blocks to get the content as a single string
+  const pageContent = blocks.map(getTextFromBlock).join('\n');
 
-    // Check if the content length is less than 5 characters
-    if (pageContent.length < 5) {
-      throw new Error(
-        `The extracted content is too short: ${pageContent.length} characters. It must be at least 5 characters long.`,
-      );
-    }
-
-    // Prepare the output based on whether instructions are provided
-    let output: string;
-    if (input.instructions) {
-      output = `Follow these instructions: ${input.instructions}\nContent: ${pageContent}`;
-    } else {
-      output = pageContent;
-    }
-
-    // Return the formatted output
-    return { notionContent: output };
-  } catch (error: any) {
-    console.error('An error occurred:', (error as Error).message);
-    throw new Error(`Error occurred: ${(error as Error).message}`);
+  // Check if the content length is less than 5 characters
+  if (pageContent.length < 5) {
+    throw new Error(
+      `The extracted content is too short: ${pageContent.length} characters. It must be at least 5 characters long.`,
+    );
   }
+
+  // Prepare the output based on whether instructions are provided
+  let output: string;
+  if (input.instructions) {
+    output = `Follow these instructions: ${input.instructions}\nContent: ${pageContent}`;
+  } else {
+    output = pageContent;
+  }
+
+  // Return the formatted output
+  return { notionPageContent: output };
 }
 
 // Helper function to retrieve all blocks from a Notion page using pagination. Recursively fetches child blocks if they exist.
