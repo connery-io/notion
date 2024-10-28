@@ -1,9 +1,14 @@
 # Notion
 
-This plugin enables interaction with Notion-based knowledge repositories,
-allowing users to query and retrieve answers from both public and private Notion pages.
-The plugin integrates with OpenAI to provide high-certainty answers based on the content
-available in Notion and suggests follow-ups in case of missing content.
+Connery plugin for retrieving content from Notion pages.
+
+The Plugin currently contains only one action: `Get Notion Page Content`.
+
+- Allows you to chat with the content of a Notion page. Can be used for FAQ, Knowledge Base, etc.
+- The action extracts all content elements including text, media, and toggles, and returns the page content as a single string. It does not extract content form inline DBs.
+- Allows you to provide additional instructions for the Connery assistant on how to handle the content.
+  - This can be useful if the table contains additional information that should not be used for answering the question.
+  - It can also be used to provide more context or output formatting instructions.
 
 ## Repository structure
 
